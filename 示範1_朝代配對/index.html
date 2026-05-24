@@ -72,6 +72,8 @@
       margin: 10px 0 0;
       color: var(--muted);
       font-size: clamp(0.95rem, 2vw, 1.08rem);
+      line-height: 1.55;
+      overflow-wrap: anywhere;
     }
 
     .score-board {
@@ -214,6 +216,7 @@
       box-shadow: 0 9px 16px rgba(0, 0, 0, 0.32);
       cursor: grab;
       user-select: none;
+      touch-action: manipulation;
       transition: opacity 150ms ease, transform 150ms ease, border-color 150ms ease, background 150ms ease;
     }
 
@@ -224,6 +227,13 @@
     .event-card.dragging {
       opacity: 0.55;
       transform: scale(0.98);
+    }
+
+    .event-card.selected {
+      border-color: var(--gold-bright);
+      background: linear-gradient(145deg, #49300c, #23170a);
+      box-shadow: 0 0 0 3px rgba(255, 213, 106, 0.24), 0 12px 20px rgba(0, 0, 0, 0.34);
+      transform: translateY(-2px);
     }
 
     .event-card.wrong {
@@ -461,6 +471,20 @@
       outline: 3px solid rgba(255, 213, 106, 0.28);
       outline-offset: 2px;
     }
+
+    @media (max-width: 760px) {
+      .page {
+        padding-top: 62px;
+      }
+
+      .map-link {
+        top: 8px;
+        left: 8px;
+        min-height: 38px;
+        padding: 8px 10px;
+        font-size: 0.86rem;
+      }
+    }
   </style>
 </head>
 <body>
@@ -469,7 +493,7 @@
     <header>
       <div>
         <h1>朝代配對</h1>
-        <p class="subtitle">把右側事件拖曳到正確的朝代卡格中。</p>
+        <p class="subtitle">把右側事件拖曳到正確的朝代卡格中。<br>手機可先點事件，再點朝代。</p>
       </div>
       <div class="score-board" aria-live="polite">
         <span class="score-label">嘗試次數</span>
@@ -542,6 +566,7 @@
     let attempts = 0;
     let matchedCount = 0;
     let draggedCard = null;
+    let selectedCard = null;
 
     function shuffle(items) {
       const copy = [...items];
@@ -559,10 +584,19 @@
       card.dataset.eventId = event.id;
       card.dataset.dynastyId = String(event.dynasty_id);
       card.setAttribute("role", "listitem");
+      card.setAttribute("tabindex", "0");
       card.innerHTML = `
         <span class="event-icon" aria-hidden="true">${event.icon}</span>
         <span class="event-text">${event.text}</span>
       `;
+
+      card.addEventListener("click", () => selectCard(card));
+      card.addEventListener("keydown", (eventObject) => {
+        if (eventObject.key === "Enter" || eventObject.key === " ") {
+          eventObject.preventDefault();
+          selectCard(card);
+        }
+      });
 
       card.addEventListener("dragstart", (eventObject) => {
         if (card.classList.contains("matched")) {
@@ -611,7 +645,13 @@
         card.addEventListener("drop", (eventObject) => {
           eventObject.preventDefault();
           card.classList.remove("drag-over");
-          handleDrop(dropZone);
+          handleDrop(dropZone, draggedCard);
+        });
+
+        card.addEventListener("click", () => {
+          if (selectedCard) {
+            handleDrop(dropZone, selectedCard);
+          }
         });
 
         dynastyGrid.appendChild(card);
@@ -631,26 +671,49 @@
       eventList.classList.toggle("is-empty", matchedCount === events.length);
     }
 
-    function handleDrop(dropZone) {
-      if (!draggedCard || draggedCard.classList.contains("matched")) {
+    function selectCard(card) {
+      if (card.classList.contains("matched")) {
+        return;
+      }
+
+      if (selectedCard) {
+        selectedCard.classList.remove("selected");
+      }
+      selectedCard = card;
+      selectedCard.classList.add("selected");
+    }
+
+    function clearSelection() {
+      if (selectedCard) {
+        selectedCard.classList.remove("selected");
+        selectedCard = null;
+      }
+    }
+
+    function handleDrop(dropZone, activeCard = draggedCard || selectedCard) {
+      if (!activeCard || activeCard.classList.contains("matched")) {
         return;
       }
 
       attempts += 1;
       const targetDynasty = dropZone.dataset.dynastyId;
-      const cardDynasty = draggedCard.dataset.dynastyId;
+      const cardDynasty = activeCard.dataset.dynastyId;
 
       if (targetDynasty === cardDynasty) {
-        draggedCard.classList.add("matched");
-        draggedCard.draggable = false;
-        dropZone.appendChild(draggedCard);
+        activeCard.classList.remove("selected");
+        activeCard.classList.add("matched");
+        activeCard.draggable = false;
+        activeCard.removeAttribute("tabindex");
+        dropZone.appendChild(activeCard);
+        clearSelection();
         matchedCount += 1;
         updateStatus();
         checkVictory();
         return;
       }
 
-      flashWrong(draggedCard);
+      flashWrong(activeCard);
+      clearSelection();
       updateStatus();
     }
 
@@ -680,6 +743,7 @@
       attempts = 0;
       matchedCount = 0;
       draggedCard = null;
+      selectedCard = null;
       victory.classList.remove("show");
       renderDynasties();
       renderEvents();

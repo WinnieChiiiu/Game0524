@@ -100,6 +100,8 @@
       margin: 8px 0 0;
       color: var(--muted);
       font-weight: 700;
+      line-height: 1.55;
+      overflow-wrap: anywhere;
     }
 
     .coins {
@@ -625,6 +627,20 @@
       outline: 3px solid rgba(103, 232, 249, 0.28);
       outline-offset: 2px;
     }
+
+    @media (max-width: 760px) {
+      .page {
+        padding-top: 62px;
+      }
+
+      .map-link {
+        top: 8px;
+        left: 8px;
+        min-height: 38px;
+        padding: 8px 10px;
+        font-size: 0.86rem;
+      }
+    }
   </style>
 </head>
 <body>
@@ -633,7 +649,7 @@
     <header>
       <div>
         <h1>打怪 RPG</h1>
-        <p class="subtitle">答題施法、賺金幣、買道具，挑戰五關魔物，每關兩題。</p>
+        <p class="subtitle">答題施法、賺金幣、買道具。<br>挑戰五關魔物，每關兩題。</p>
       </div>
       <div class="coins" id="coinCounter">💰 0</div>
     </header>
