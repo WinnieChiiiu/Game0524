@@ -700,8 +700,9 @@
     let placed = {};
     let drag = null;
     let endingIndex = 0;
+    let completedSeconds = null;
 
-    function ensureStartTime() {
+    function beginAdventureTimer() {
       if (!localStorage.getItem("adventure_start")) {
         localStorage.setItem("adventure_start", String(Date.now()));
       }
@@ -730,6 +731,7 @@
 
     function enterMap() {
       sessionStorage.setItem("adventure_cover_seen", "true");
+      beginAdventureTimer();
       coverScreen.classList.add("hidden");
     }
 
@@ -910,12 +912,17 @@
         return;
       }
 
+      completedSeconds = getAdventureSeconds();
       window.setTimeout(startEndingSequence, 420);
     }
 
-    function formatAdventureTime() {
+    function getAdventureSeconds() {
       const start = Number(localStorage.getItem("adventure_start")) || Date.now();
-      const seconds = Math.max(0, Math.floor((Date.now() - start) / 1000));
+      return Math.max(0, Math.floor((Date.now() - start) / 1000));
+    }
+
+    function formatAdventureTime() {
+      const seconds = completedSeconds ?? getAdventureSeconds();
       const minutes = Math.floor(seconds / 60);
       const remain = seconds % 60;
       return `${String(minutes).padStart(2, "0")} 分 ${String(remain).padStart(2, "0")} 秒`;
@@ -962,7 +969,7 @@
     function clearAllProgress() {
       localStorage.clear();
       sessionStorage.clear();
-      ensureStartTime();
+      completedSeconds = null;
       updateMapStatus();
       renderGate();
       gateModal.classList.remove("show");
@@ -980,9 +987,14 @@
 
     coverScreen.addEventListener("click", enterMap);
 
+    document.querySelectorAll(".hotspot[href]").forEach((link) => {
+      link.addEventListener("click", beginAdventureTimer);
+    });
+
     clearProgressBtn.addEventListener("click", clearAllProgress);
 
     openGateBtn.addEventListener("click", () => {
+      beginAdventureTimer();
       renderGate();
       gateModal.classList.add("show");
     });
@@ -1009,7 +1021,6 @@
 
     window.addEventListener("pageshow", updateMapStatus);
 
-    ensureStartTime();
     showCoverIfNeeded();
     updateMapStatus();
     preloadEndingImages();
