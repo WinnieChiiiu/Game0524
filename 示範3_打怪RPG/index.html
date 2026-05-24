@@ -633,7 +633,7 @@
     <header>
       <div>
         <h1>打怪 RPG</h1>
-        <p class="subtitle">答題施法、賺金幣、買道具，挑戰五關魔物。</p>
+        <p class="subtitle">答題施法、賺金幣、買道具，挑戰五關魔物，每關兩題。</p>
       </div>
       <div class="coins" id="coinCounter">💰 0</div>
     </header>
@@ -734,7 +734,7 @@
           <article class="shop-item">
             <div class="shop-icon">💎</div>
             <h3>攻擊水晶</h3>
-            <p>下一題答對暴擊，怪物 -50 HP。</p>
+            <p>下一題答對暴擊，怪物 -100 HP。</p>
             <p>價格：40 金幣</p>
             <button type="button" data-buy="crystal">購買</button>
           </article>
@@ -793,6 +793,10 @@
       charm: 80
     };
 
+    const QUESTIONS_PER_LEVEL = 2;
+    const NORMAL_DAMAGE = 50;
+    const CRITICAL_DAMAGE = 100;
+
     const screens = {
       loading: document.querySelector("#loadingScreen"),
       battle: document.querySelector("#battleScreen"),
@@ -840,6 +844,8 @@
     let potionUsed = 0;
     let locked = false;
     let currentQuestion = null;
+    let questionDeck = [];
+    let stageQuestionCount = 0;
     let inventory = { potion: 0, crystal: 0, charm: 0 };
 
     function showScreen(name) {
@@ -859,6 +865,13 @@
 
     function randomInt(min, max) {
       return Math.floor(Math.random() * (max - min + 1)) + min;
+    }
+
+    function drawQuestion() {
+      if (questionDeck.length === 0) {
+        questionDeck = shuffle(questionBank);
+      }
+      return questionDeck.pop();
     }
 
     function parseCSV(text) {
@@ -945,6 +958,8 @@
       correctAnswers = 0;
       potionUsed = 0;
       locked = false;
+      questionDeck = shuffle(questionBank);
+      stageQuestionCount = 0;
       inventory = { potion: 0, crystal: 0, charm: 0 };
       inventoryPanel.classList.remove("show");
       endCard.className = "end-card";
@@ -954,6 +969,7 @@
 
     function startLevel() {
       monsterHp = MONSTERS[levelIndex].hp;
+      stageQuestionCount = 0;
       locked = false;
       inventoryPanel.classList.remove("show");
       showScreen("battle");
@@ -963,9 +979,11 @@
     }
 
     function nextQuestion() {
-      currentQuestion = questionBank[randomInt(0, questionBank.length - 1)];
+      currentQuestion = drawQuestion();
+      stageQuestionCount += 1;
       questionText.textContent = currentQuestion.question;
-      questionSource.textContent = usedFallback ? "內建範例題庫" : "Google Sheets 題庫";
+      const sourceName = usedFallback ? "內建範例題庫" : "Google Sheets 題庫";
+      questionSource.textContent = `${sourceName}｜本關第 ${stageQuestionCount} / ${QUESTIONS_PER_LEVEL} 題`;
 
       const optionTexts = shuffle([currentQuestion.correct, ...currentQuestion.wrong])
         .slice(0, 4);
@@ -1029,7 +1047,7 @@
         correctAnswers += 1;
         coins += 5;
         const isCritical = inventory.crystal > 0;
-        const damage = isCritical ? 50 : 25;
+        const damage = isCritical ? CRITICAL_DAMAGE : NORMAL_DAMAGE;
         if (isCritical) {
           inventory.crystal -= 1;
           showCritical();
@@ -1038,11 +1056,13 @@
         battleCard.classList.remove("flash-correct");
         void battleCard.offsetWidth;
         battleCard.classList.add("flash-correct");
-        statusText.textContent = isCritical ? `答對！暴擊造成 ${damage} 傷害，獲得 5 金幣。` : "答對！怪物受到 25 傷害，獲得 5 金幣。";
+        statusText.textContent = isCritical ? `答對！暴擊造成 ${damage} 傷害，獲得 5 金幣。` : `答對！怪物受到 ${damage} 傷害，獲得 5 金幣。`;
         updateAll();
 
         window.setTimeout(() => {
-          if (monsterHp <= 0) {
+          if (monsterHp <= 0 || stageQuestionCount >= QUESTIONS_PER_LEVEL) {
+            monsterHp = 0;
+            updateAll();
             defeatMonster();
           } else {
             locked = false;
@@ -1069,6 +1089,12 @@
 
     function handleDamageResult(hpBefore) {
       if (heroHp > 0) {
+        if (stageQuestionCount >= QUESTIONS_PER_LEVEL) {
+          monsterHp = 0;
+          updateAll();
+          defeatMonster();
+          return;
+        }
         locked = false;
         setOptionsDisabled(false);
         nextQuestion();
@@ -1082,6 +1108,12 @@
         locked = false;
         setOptionsDisabled(false);
         updateAll();
+        if (stageQuestionCount >= QUESTIONS_PER_LEVEL) {
+          monsterHp = 0;
+          updateAll();
+          defeatMonster();
+          return;
+        }
         nextQuestion();
         statusText.textContent = "救命符發動！HP 回到 1，繼續戰鬥。";
         return;
@@ -1094,6 +1126,7 @@
 
       heroHp = 1;
       monsterHp = MONSTERS[levelIndex].hp;
+      stageQuestionCount = 0;
       locked = false;
       updateAll();
       nextQuestion();
